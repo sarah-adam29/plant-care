@@ -6,6 +6,8 @@ Most plant apps give the same generic schedule to every plant of a species. In p
 
 Live at [plant-care.xyz](https://plant-care.xyz) (invite-only for now; screenshots below use the built-in sample plants).
 
+> **About this repo:** this is a public snapshot of the app's code, with the sample data anonymised. The live site runs from a private copy of the same code, alongside my own plants and settings. Deployment settings (database, logins, email, hosting) live in those services' dashboards rather than in the code. See [Deploy your own](#deploy-your-own).
+
 <table>
   <tr>
     <td><img src="docs/screenshots/01-home.jpg" width="220" alt="Home: greeting, weather alert, today's checks"></td>
@@ -118,10 +120,24 @@ cp .env.example .env.local   # add your ANTHROPIC_API_KEY (or set PLANT_AI_MOCK=
 npm run dev                  # http://localhost:3000, with five sample plants
 ```
 
-Local mode stores data in `.data/` and needs no database. For the cloud version, create a Supabase project, run [`supabase/schema.sql`](supabase/schema.sql) and then the files in [`supabase/migrations/`](supabase/migrations) in order, and set the variables listed in `.env.example`. Useful scripts:
+Local mode stores data in `.data/` and needs no database or login. Useful scripts:
 
 - `npm run briefing -- spike`: print exactly what Claude sees for a plant
 - `npm run compare`: run the model comparison
+
+## Deploy your own
+
+The live version needs a few services configured in their dashboards. Several of these steps exist because of problems I hit while launching (noted in *italics*).
+
+| Service | What to set up |
+|---|---|
+| **Supabase: database** | Create a project. In the SQL editor, run [`supabase/schema.sql`](supabase/schema.sql), then the files in [`supabase/migrations/`](supabase/migrations) in order (`002` → `003` → `004`). Create a **private** storage bucket called `plant-photos`. |
+| **Supabase: first admin** | Sign-up is invite-only, so let yourself in first: run `insert into public.allowed_emails (email) values ('you@yourdomain.com');`, sign in on the site and create your home, then run the `app_admins` insert at the end of `002_family.sql` with your email. After that you can approve others from Settings. |
+| **Supabase: auth** | Make sure the *Magic Link* and *Confirm signup* email templates include `{{ .Token }}`, so people get a code rather than only a link. *Links opened in a different browser caused a login loop.* Set up custom SMTP (e.g. Resend with your own domain). *The built-in email is rate-limited and only meant for testing.* Set the Site URL and redirect URLs to your domain. |
+| **Vercel: hosting** | Import the repo and add the environment variables from `.env.example`: `ANTHROPIC_API_KEY`, `PLANT_AI_MODEL`, `PLANT_STORE=supabase`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (optional: `PLANT_CHAT_MODEL`). Don't add the Supabase secret key, which is only for local scripts. Set the function region close to your Supabase region. *Pages were slow until both were in the same region.* |
+| **Anthropic** | Create an API key and set a monthly spend limit (the app also caps each home at 30 AI actions a day). |
+| **Weather** | Nothing to set up. Uses [Open-Meteo](https://open-meteo.com), free for non-commercial use. |
+| **Domain** (optional) | Point your DNS at Vercel (DNS only, not proxied) and redirect `www` to the root domain. *A brand-new domain can be blocked by some networks' filters for a while.* |
 
 The code is commented throughout (look for 📘 LEARN) as I built it to learn, not just to ship.
 
